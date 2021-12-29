@@ -1,0 +1,121 @@
+#!/usr/bin/env sh
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+PROG="$(basename "$0")"
+USER="${SUDO_USER:-${USER}}"
+HOME="${USER_HOME:-${HOME}}"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#set opts
+PROG_ENV_NAME="$(echo "$PROG" | tr '[a-z]' '[A-Z]')"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+##@Version       :
+# @Author        : Jason
+# @Contact       : jason@casjaysdev.com
+# @License       : WTFPL
+# @ReadME        : entrypoint --help
+# @Copyright     : Copyright (c) 2021, Jason, Casjays Developments
+# @Created       : Wednesday Dec 29, 2021 06:36:32 EST
+# @File          : entrypoint
+# @Description   :
+# @TODO          :
+# @Other         :
+# @Resource      :
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Set functions
+__version() { __grep_head 'Version' "$PROG" | __sed_head | head -n1 | grep '^'; }
+__printf_color() { printf "%b" "$(tput setaf "${2:-2}" 2>/dev/null)" "$1" "$(tput sgr0 2>/dev/null)"; }
+__printf_head() { __printf_color "\n\t\t$__heading\n\t\t$2\n\t\t$__heading\n" "$1"; }
+__list_options() { echo -n "-$SHORTOPTS " | sed 's#:##g;s#,# -#g' && echo "--$LONGOPTS " | sed 's#:##g;s#,# --#g' && exit; }
+__list_array() { echo "$ARRAY" | tr ',' ' ' | tr ' ' '\n'; }
+__sed_remove_empty() { sed '/^\#/d;/^$/d;s#^ ##g'; }
+__sed_head() { sed -E 's/^.*#//g;s#^ ##g;s/^@//g'; }
+__grep_head() {
+  grep -sE '[".#]?@[A-Z]' "$(type -p "${2:-$PROG}")" | grep "${1:-}" | __sed_head | __sed_remove_empty | grep '^' || return 1
+}
+__printf_help() {
+  color="$1" && shift 1
+  msg="$*"
+  shift
+  __printf_color "\t\t$msg\n" "$color"
+}
+__help() {
+  printf '\n'
+  __printf_head "5" "$PROG: $(__grep_head "Description" "$PROG" | __sed_head)"
+  __printf_help "6" "Usage: $PROG "
+  __printf_help "4" ""
+  printf '\n'
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Set additional variables
+exitCode=""
+PROG_ENV_NAME_ARRAY_DIR="$HOME/.config/$PROG/array"
+PROG_ENV_NAME_CONFIG_DIR="$HOME/.config/$PROG"
+PROG_ENV_NAME_CONFIG_FILE="settings.conf"
+[ -d "$PROG_ENV_NAME_CONFIG_DIR" ] || mkdir -p "$PROG_ENV_NAME_CONFIG_DIR"
+[ -f "$PROG_ENV_NAME_CONFIG_DIR/$PROG_ENV_NAME_CONFIG_FILE" ] && . "$PROG_ENV_NAME_CONFIG_DIR/$PROG_ENV_NAME_CONFIG_FILE"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Argument/Option settings
+SETARGS="${*}"
+SHORTOPTS=""
+LONGOPTS="options,config,version,help,port:"
+ARRAY=""
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Setup application options
+setopts=$(getopt -o "$SHORTOPTS" --long "$LONGOPTS" -n "$APPNAME" -- "$@" 2>/dev/null)
+eval set -- "$setopts" 2>/dev/null
+while :; do
+  case $1 in
+  --options)
+    shift 1
+    __list_options
+    __list_array
+    ;;
+  --version)
+    shift 1
+    __version
+    ;;
+  --help)
+    shift 1
+    __help
+    ;;
+  --config)
+    shift 1
+    __gen_config
+    ;;
+  --port)
+    PORT="$2"
+    shift 2
+    ;;
+  --health)
+    shift 1
+    curl -I "http://localhost:$PORT" | grep -q 200 && exit 0 || exit 1
+    ;;
+  --)
+    shift 1
+    break
+    ;;
+  esac
+done
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if [ -d "/app" ]; then
+  cd /app || exit 1
+else
+  echo "the directory /app does not exist"
+  exit 1
+fi
+[ -z "$PORT" ] && PORT="14300"
+[ -z "$TZ" ] && TZ="America/New_York"
+IP=$(ip addr | grep inet 2>/dev/null | grep -vE "127|inet6" | tr '/' ' ' | awk '{print $2}' | head -n 1)
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Main application
+echo "PORT=$PORT" >"$PROG_ENV_NAME_CONFIG_DIR/$PROG_ENV_NAME_CONFIG_FILE"
+echo "IP=$IP" >>"$PROG_ENV_NAME_CONFIG_DIR/$PROG_ENV_NAME_CONFIG_FILE"
+
+python3 ./manage.py migrate
+python3 ./manage.py createsuperuser --username admin --email 'admin@localhost' --noinput
+python3 ./manage.py runserver $IP:$PORT
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# End application
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
