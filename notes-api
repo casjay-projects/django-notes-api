@@ -10,7 +10,7 @@ PROG_ENV_NAME="$(echo "$PROG" | tr '[a-z]' '[A-Z]')"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ##@Version       :
 # @Author        : Jason
-# @Contact       : jason@casjaysdev.com
+# @Contact       : jason@casjaysdev.pro
 # @License       : WTFPL
 # @ReadME        : entrypoint --help
 # @Copyright     : Copyright (c) 2021, Jason, Casjays Developments
